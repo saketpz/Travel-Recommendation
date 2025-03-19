@@ -4,6 +4,8 @@ import os
 import requests
 import json
 import sqlite3
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 # Load environment variables
 load_dotenv()
@@ -12,6 +14,7 @@ OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 EVENTBRITE_API_KEY = os.getenv("EVENTBRITE_API_KEY")
 
 app = Flask(__name__)
+CORS(app)  # Allow CORS for all routes
 
 ##############################################
 # 1. Convert City to Coordinates (Geocoding)
