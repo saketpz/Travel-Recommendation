@@ -1,0 +1,126 @@
+/* Container for the entire app */
+.App {
+  max-width: 1000px; /* Increased for a bit more horizontal space */
+  margin: auto;
+  padding: 20px;
+  font-family: Arial, sans-serif;
+}
+
+/* Header styling */
+header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+header h1 {
+  margin: 0;
+  padding: 15px;
+  background-color: #007bff;
+  color: #fff;
+  border-radius: 5px;
+}
+
+/* Recommendation form styling */
+.recommendation-form {
+  background-color: #f8f8f8;
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 10px;
+}
+
+.form-group label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 8px;
+  box-sizing: border-box;
+  border-radius: 3px;
+  border: 1px solid #ccc;
+}
+
+/* Button styling */
+button {
+  padding: 10px 20px;
+  background-color: #007bff;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: #0056b3;
+}
+
+/* Loading & error messages */
+.loading,
+.error {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.error {
+  color: red;
+}
+
+/* Results container & sections */
+.results {
+  margin-top: 20px;
+}
+
+.results section {
+  margin-bottom: 30px;
+}
+
+/* Card container for destinations & events */
+.cards-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-top: 10px;
+}
+
+/* Individual card styling */
+.card {
+  background-color: #fff;
+  border: 1px solid #ddd;
+  padding: 15px;
+  border-radius: 5px;
+  flex: 1 1 250px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.card p {
+  margin: 5px 0;
+}
+
+/* Hover effect on cards */
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Event link styling */
+.event-link {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.event-link:hover {
+  text-decoration: underline;
+}
