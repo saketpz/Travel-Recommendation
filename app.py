@@ -1,26 +1,25 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from dotenv import load_dotenv
 import os
 import requests
 import json
-import sqlite3
-from flask import Flask, request, jsonify
-from flask_cors import CORS
 
 # Load environment variables
 load_dotenv()
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 EVENTBRITE_API_KEY = os.getenv("EVENTBRITE_API_KEY")
+UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
 
 app = Flask(__name__)
-CORS(app)  # Allow CORS for all routes
+CORS(app)  # Enable CORS for all routes
 
 ##############################################
 # 1. Convert City to Coordinates (Geocoding)
 ##############################################
 def get_coordinates_from_city(city_name, api_key):
-    """Converts a city name to "lat,lon" using Google Geocoding API."""
+    """Converts a city name to 'lat,lon' using Google Geocoding API."""
     url = "https://maps.googleapis.com/maps/api/geocode/json"
     params = {"address": city_name, "key": api_key}
     try:
@@ -39,7 +38,10 @@ def get_coordinates_from_city(city_name, api_key):
 # 2. Fetch General Places Using Google Places API
 ###################################################
 def get_nearby_places(location, preference, api_key):
-    """Fetches nearby places for a given category using Google Places API."""
+    """
+    Fetches nearby places for a given category using Google Places API.
+    Returns only places with rating >= 4.0.
+    """
     place_types = {
         "temple": "hindu_temple",
         "mosque": "mosque",
@@ -88,7 +90,10 @@ def get_nearby_places(location, preference, api_key):
 # 3. Fetch Trekking Spots Using OpenStreetMap (OSM) API
 #############################################################
 def get_trekking_spots_osm(lat, lon, radius_km=50):
-    """Fetch trekking spots using OpenStreetMap's Overpass API (only named nodes)."""
+    """
+    Fetch trekking spots from OSM Overpass API.
+    Only nodes with a 'name' are returned.
+    """
     overpass_url = "http://overpass-api.de/api/interpreter"
     query = f"""
     [out:json];
@@ -114,11 +119,13 @@ def get_trekking_spots_osm(lat, lon, radius_km=50):
         print("Error fetching trekking spots:", e)
         return [{"name": "Error fetching treks"}]
 
-####################################################################
+##########################################################################
 # 4. (Optional) Fetch Additional Trek Details from Google Places API
-####################################################################
+##########################################################################
 def get_trek_details_google(name, api_key):
-    """Fetches trek details (rating, reviews, address) using Google Places API."""
+    """
+    Fetches trek details (rating, reviews, address) using Google Places API.
+    """
     url = "https://maps.googleapis.com/maps/api/place/findplacefromtext/json"
     params = {
         "input": name,
@@ -162,7 +169,7 @@ def merge_duplicate_places(places, precision=4):
 # 6. Fetch Weather Data Using OpenWeather API
 ###########################################################
 def get_weather_info(location, api_key):
-    """Fetches current weather for a given "lat,lon" location using OpenWeather API."""
+    """Fetches current weather for a given 'lat,lon' using OpenWeather API."""
     url = "https://api.openweathermap.org/data/2.5/weather"
     params = {
         "lat": location.split(",")[0],
@@ -191,7 +198,7 @@ def get_upcoming_events(city, api_key):
     url = "https://www.eventbriteapi.com/v3/events/search/"
     params = {
         "location.address": city,
-        "location.within": "100km",  # Increase radius for more events
+        "location.within": "100km",
         "sort_by": "date",
         "categories": "music, arts, culture, sports, food, business",
         "token": api_key
@@ -214,30 +221,30 @@ def get_upcoming_events(city, api_key):
         print("Error fetching events:", e)
         return [{"name": "Error fetching events"}]
 
-
+###########################################################
+# 8. Fetch Real-time Travel Time Using Google API
+###########################################################
 def get_travel_time(origin, destination, api_key, mode="driving"):
     """
     Fetches real-time travel time using Google Distance Matrix API.
     
     Parameters:
-      - origin: A string in the format "lat,lon" for the starting location.
-      - destination: A string in the format "lat,lon" for the destination.
-      - api_key: Your Google Maps API key.
-      - mode: Travel mode ("driving", "walking", "transit"), defaults to "driving".
+      - origin: "lat,lon" for starting location.
+      - destination: "lat,lon" for destination.
+      - mode: Travel mode ("driving", "walking", "transit").
       
     Returns:
-      - A string representing the travel time in minutes (e.g., "15 mins") or "Unknown" if not available.
+      - Travel time as a string in minutes (e.g., "15 mins") or "Unknown".
     """
     url = "https://maps.googleapis.com/maps/api/distancematrix/json"
     params = {
         "origins": origin,
         "destinations": destination,
-        "mode": mode,              # e.g., driving, walking, transit
-        "departure_time": "now",   # Use real-time traffic data
+        "mode": mode,
+        "departure_time": "now",
         "traffic_model": "best_guess",
         "key": api_key
     }
-    
     try:
         response = requests.get(url, params=params)
         data = response.json()
@@ -254,13 +261,125 @@ def get_travel_time(origin, destination, api_key, mode="driving"):
         print("Error fetching travel time:", e)
         return "Unknown"
 
+###############################################################
+# 9. Best Season to Visit Based on Category (Static Mapping)
+###############################################################
+def get_best_season_for_category(category):
+    """
+    Returns a recommended best season or months for visiting based on the place category.
+    """
+    best_season_map = {
+        "trekking": "October to March",
+        "temple": "All year round",
+        "historical": "October to March",
+        "nature": "Monsoon & Winter (June to February)",
+        "adventure": "October to March",
+        "food": "All year round",
+        "shopping": "All year round",
+        "beach": "November to February",
+        "nightlife": "All year round",
+        "wellness": "All year round",
+        "family": "All year round"
+    }
+    return best_season_map.get(category.lower(), "All year round")
 
-####################################################################
-# 8. Main Flask API Endpoint for Travel Recommendations
-####################################################################
+###########################################################
+# 10. Fetch Description from Wikipedia (Free, Optional)
+###########################################################
+def get_wikipedia_description(place_name):
+    """
+    Fetches a short summary of the place from Wikipedia's REST API.
+    Returns an empty string if not available.
+    """
+    title = place_name.replace(" ", "_")
+    url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{title}"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("extract", "No description available.")
+        else:
+            return "No description available."
+    except Exception as e:
+        print("Error fetching Wikipedia description:", e)
+        return "No description available."
+
+###########################################################
+# 11. Calculate Score and Rank Destinations (Recommendation Logic)
+###########################################################
+def calculate_score(place):
+    """
+    Calculates a score for a place based on rating, travel time, and number of reviews.
+    Higher score means a better recommendation.
+    """
+    # Convert rating to float; default to 4.0 if not valid
+    try:
+        rating = float(place.get("rating", 4.0))
+    except (ValueError, TypeError):
+        rating = 4.0
+
+    # Convert reviews to float; default to 0 if not valid
+    try:
+        reviews = float(place.get("user_ratings", place.get("reviews", 0)))
+    except (ValueError, TypeError):
+        reviews = 0
+
+    # Convert travel time string (e.g., "15 mins") to an integer (in minutes)
+    travel_str = place.get("travel_time", "30 mins")
+    try:
+        travel_val = int(travel_str.split()[0])
+    except (ValueError, IndexError):
+        travel_val = 30
+
+    # Example scoring formula: Increase score for higher rating & reviews; subtract penalty for longer travel time.
+    score = (rating * 10) + (reviews * 0.01) - (travel_val * 0.5)
+    return score
+
+def rank_destinations(destinations):
+    """Ranks destinations using calculated scores and returns them sorted in descending order."""
+    for place in destinations:
+        place["score"] = calculate_score(place)
+    return sorted(destinations, key=lambda x: x["score"], reverse=True)
+
+
+def fetch_image_for_place(place_name, city_name=None):
+    """
+    Fetches a single image URL from Unsplash based on the place name.
+    Optionally include city_name in the query for better context.
+    Returns None if no image found.
+    """
+    if not UNSPLASH_ACCESS_KEY:
+        return None  # Avoid errors if key is missing
+
+    base_url = "https://api.unsplash.com/search/photos"
+    query = place_name if not city_name else f"{place_name} {city_name}"
+    params = {
+        "query": query,
+        "per_page": 1,          # Get only 1 image
+        "orientation": "landscape",  # Or "portrait" if you prefer
+        "client_id": UNSPLASH_ACCESS_KEY
+    }
+    
+    try:
+        response = requests.get(base_url, params=params)
+        data = response.json()
+        results = data.get("results", [])
+        if len(results) > 0:
+            # 'small' is good for quick loading; you can use 'regular' or 'thumb'
+            return results[0]["urls"]["small"]
+        else:
+            return None
+    except Exception as e:
+        print("Error fetching Unsplash image:", e)
+        return None
+    
+    
+###############################################################
+# 12. Main Flask API Endpoint for Travel Recommendations
+###############################################################
 @app.route('/recommend', methods=['POST'])
 def recommend():
-    """Fetches recommendations based on city name and preferences."""
+    """Fetches recommendations based on city name and preferences, then applies ranking and adds additional details."""
     data = request.get_json()
     if not data:
         return jsonify({"error": "Missing JSON body"}), 400
@@ -280,29 +399,37 @@ def recommend():
     all_destinations = []
     # Process each preference
     for preference in preferences.split(","):
-        preference = preference.strip()
-        if preference.lower() == "trekking":
+        pref = preference.strip().lower()
+        if pref == "trekking":
             lat, lon = map(float, user_location.split(","))
             treks = get_trekking_spots_osm(lat, lon)
-            # Optionally update each trek with additional Google Places details
             for trek in treks:
                 details = get_trek_details_google(trek["name"], GOOGLE_MAPS_API_KEY)
                 trek.update(details)
+                trek["category"] = "trekking"
+                trek["best_season"] = get_best_season_for_category("trekking")
+                trek["description"] = get_wikipedia_description(trek["name"])
             all_destinations.extend(treks)
         else:
-            places = get_nearby_places(user_location, preference, GOOGLE_MAPS_API_KEY)
+            places = get_nearby_places(user_location, pref, GOOGLE_MAPS_API_KEY)
             for place in places:
-                place["travel_time"] = get_travel_time(user_location, f"{place['lat']},{place['lng']}", GOOGLE_MAPS_API_KEY, travel_mode)
+                tt = get_travel_time(user_location, f"{place['lat']},{place['lng']}", GOOGLE_MAPS_API_KEY, travel_mode)
+                place["travel_time"] = tt if tt is not None else "Unknown"
+                place["best_season"] = get_best_season_for_category(pref)
+                place["description"] = get_wikipedia_description(place["name"])
             all_destinations.extend(places)
 
     # Merge duplicate places
     all_destinations = merge_duplicate_places(all_destinations)
+    # Rank destinations using our scoring function
+    ranked_destinations = rank_destinations(all_destinations)
+
     weather_info = get_weather_info(user_location, OPENWEATHER_API_KEY)
     events = get_upcoming_events(user_city, EVENTBRITE_API_KEY)
 
     return jsonify({
         "weather": weather_info,
-        "destinations": all_destinations,
+        "destinations": ranked_destinations,
         "events": events
     })
 
